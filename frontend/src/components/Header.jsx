@@ -13,11 +13,11 @@ export default function Header({
   const isConnected = healthStatus.status === 'connected' && healthStatus.model_available;
 
   return (
-    <header className="px-6 py-4 border-b border-slate-100 flex items-center justify-between no-print">
+    <header className="px-6 py-4 flex items-center justify-between no-print">
       
       {/* Title & Avatar Stack */}
-      <div className="flex items-center gap-4">
-        <h1 className="text-xl font-extrabold text-slate-800 tracking-tight">
+      <div className="flex items-center gap-4 pb-4 border-b border-slate-200 mb-8">
+        <h1 className="text-3xl font-extrabold text-[#0369A1] tracking-tight flex items-center gap-3" style={{ letterSpacing: '-0.01em' }}>
           Medical Consultation
         </h1>
 
@@ -35,7 +35,7 @@ export default function Header({
         </div>
 
         {/* Status indicator pill */}
-        <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 text-xs font-semibold">
+        <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] bg-purple-50 text-purple-700 text-xs font-bold uppercase tracking-[0.05em] shadow-sm border border-purple-200/40">
           <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
           <span>{isConnected ? 'MedGemma:4b Connected' : 'Checking Ollama...'}</span>
         </div>

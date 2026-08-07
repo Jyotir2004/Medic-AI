@@ -127,6 +127,7 @@ export default function ChatInterface({
     clearInterval(timerIntervalRef.current);
   };
 
+
   const toggleVoiceRecording = () => {
     if (isRecording) {
       stopVoiceRecording();
@@ -186,28 +187,30 @@ export default function ChatInterface({
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 px-4 sm:px-6 pt-3 pb-4 relative overflow-hidden">
+    <div className="flex-1 flex flex-col min-h-0 px-4 sm:px-6 pt-3 pb-5 relative overflow-visible">
       
       {/* Scrollable Messages Container */}
-      <div className="flex-1 overflow-y-auto space-y-5 pr-2 mb-3 min-h-0">
+      <div className={`flex-1 overflow-y-auto pr-2 mb-3 min-h-0 ${messages.length === 0 ? 'flex flex-col items-center justify-center my-auto' : 'space-y-5'}`}>
         
         {/* Welcome Empty State */}
         {messages.length === 0 && (
-          <div className="py-6 px-4 text-center max-w-xl mx-auto space-y-3">
-            <div className="w-14 h-14 rounded-3xl bg-gradient-to-tr from-purple-600 to-indigo-600 border border-purple-300 text-white flex items-center justify-center mx-auto shadow-md shadow-purple-500/20">
-              <Bot className="w-7 h-7 animate-pulse" />
+          <div className="py-8 px-4 text-center max-w-2xl mx-auto space-y-4 my-auto flex flex-col items-center justify-center">
+            <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-purple-600 to-indigo-600 border border-purple-300 text-white flex items-center justify-center mx-auto shadow-xl shadow-purple-500/25">
+              <Bot className="w-8 h-8 animate-pulse" />
             </div>
-            <div>
-              <h2 className="text-lg font-bold text-slate-900">Hello! I'm MedicAI</h2>
-              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                Powered by <strong className="text-purple-700">MedGemma 4B</strong> & <strong className="text-purple-700">ElevenLabs Voice AI</strong>. Describe your symptoms or select a prompt below.
+            <div className="space-y-1.5 max-w-lg mx-auto">
+              <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">Hello! I'm MedicAI</h2>
+              <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
+                Powered by <strong className="text-purple-700 font-bold">MedGemma 4B</strong> & <strong className="text-purple-700 font-bold">ElevenLabs Voice AI</strong>. Describe your symptoms or select a prompt below.
               </p>
             </div>
 
-            <QuickPrompts 
-              categories={quickPrompts} 
-              onSelectPrompt={(p) => setInputText(p)} 
-            />
+            <div className="w-full pt-2">
+              <QuickPrompts 
+                categories={quickPrompts} 
+                onSelectPrompt={(p) => setInputText(p)} 
+              />
+            </div>
           </div>
         )}
 
@@ -218,7 +221,7 @@ export default function ChatInterface({
           return (
             <div
               key={idx}
-              className={`flex items-start gap-2.5 ${isUser ? 'justify-end' : 'justify-start'}`}
+              className={`flex items-start gap-2.5 my-2.5 ${isUser ? 'justify-end pl-6' : 'justify-start pr-6'}`}
             >
               {!isUser && (
                 <div className="w-8 h-8 rounded-full bg-purple-100 border border-purple-300 text-purple-700 flex items-center justify-center flex-shrink-0 shadow-sm mt-1">
@@ -226,16 +229,24 @@ export default function ChatInterface({
                 </div>
               )}
 
-              <div className="max-w-[85%] space-y-1">
+              <div className={`max-w-[82%] space-y-1 ${isUser ? 'flex flex-col items-end' : ''}`}>
                 <div
                   className={`p-3.5 text-xs sm:text-sm leading-relaxed ${
-                    isUser ? 'user-bubble' : 'assistant-bubble'
+                    isUser
+                      ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl rounded-tr-xs shadow-md shadow-purple-600/15 font-medium break-words max-w-full text-left'
+                      : 'assistant-bubble'
                   }`}
                 >
                   {isUser ? (
                     <div className="whitespace-pre-wrap font-medium">{msg.content}</div>
                   ) : (
-                    <MarkdownRenderer content={msg.content} />
+                    <MarkdownRenderer 
+                      content={msg.content} 
+                      onSelectDisease={(disease) => onSendMessage(
+                        `I select ${disease}. Please provide the specific OTC medications, dosages, precautions, and curing techniques for ${disease}.`,
+                        `I select ${disease}`
+                      )}
+                    />
                   )}
                 </div>
 
@@ -310,7 +321,8 @@ export default function ChatInterface({
       {/* Perfect Floating Bottom Typing Bar */}
       <form 
         onSubmit={handleSubmit}
-        className="bg-white border border-purple-200/90 rounded-2xl p-2.5 shadow-lg shadow-purple-900/5 focus-within:border-purple-500 focus-within:ring-2 focus-within:ring-purple-500/20 transition-all flex items-center gap-2.5 flex-shrink-0 relative z-20"
+        style={{ minHeight: '46px', height: 'auto' }}
+        className="bg-white hover:bg-[#fafafa] focus-within:bg-[#fafafa] border border-purple-300/80 focus-within:border-purple-500 rounded-2xl px-3 py-2 shadow-lg shadow-purple-900/5 focus-within:shadow-[0_0_20px_2px_rgba(139,92,246,0.25),0_10px_25px_-5px_rgba(139,92,246,0.1)] transition-all duration-300 flex items-end gap-2.5 flex-shrink-0 relative z-20"
       >
         <textarea
           value={inputText}
@@ -324,11 +336,12 @@ export default function ChatInterface({
               : 'Describe your symptoms, e.g., "Fever and headache for 2 days"...'
           }
           rows={1}
-          className="flex-1 bg-transparent text-slate-900 text-xs sm:text-sm placeholder-slate-400 focus:outline-none resize-none px-3 py-1 font-sans leading-relaxed"
+          style={{ minHeight: '44px', maxHeight: '200px', paddingTop: '10px', paddingBottom: '10px', overflowY: 'auto' }}
+          className="flex-1 bg-transparent text-slate-900 text-xs sm:text-sm placeholder-slate-400 focus:outline-none resize-none px-3 font-sans leading-relaxed block"
         />
 
         {/* Action Controls */}
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2 flex-shrink-0 self-center mb-[2px]">
           
           {/* Sound Wave Recording Indicator */}
           {isRecording && (
@@ -365,10 +378,10 @@ export default function ChatInterface({
           <button
             type="submit"
             disabled={!inputText.trim() || isStreaming}
-            className="p-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-md shadow-purple-600/20"
+            className="w-8 h-8 min-w-[32px] min-h-[32px] p-0 rounded-xl bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:transform-none transition-all duration-200 ease-out shadow-md shadow-purple-600/20 hover:shadow-lg hover:shadow-purple-600/40 hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center group flex-shrink-0"
             title="Send Symptom Description"
           >
-            <Send className="w-4 h-4" />
+            <Send className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
           </button>
         </div>
       </form>

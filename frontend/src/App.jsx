@@ -172,23 +172,28 @@ export default function App() {
     }
   };
 
-  const handleSendMessage = async (userText) => {
-    const newMessages = [...messages, { role: 'user', content: userText }];
+  const handleSendMessage = async (userText, displayText = null) => {
+    const shownText = displayText || userText;
+    const newMessages = [...messages, { role: 'user', content: shownText }];
     setMessages(newMessages);
     setIsStreaming(true);
 
     const currentChat = chats.find((c) => c.id === activeChatId);
     let updatedTitle = currentChat?.title || 'Symptom Consultation';
     if (!currentChat?.messages || currentChat.messages.length === 0) {
-      updatedTitle = userText.slice(0, 25) + (userText.length > 25 ? '...' : '');
+      updatedTitle = shownText.slice(0, 25) + (shownText.length > 25 ? '...' : '');
     }
+
+    // Build payload for AI streaming
+    const apiPayloadMessages = messages.map(m => ({ role: m.role, content: m.content }));
+    apiPayloadMessages.push({ role: 'user', content: userText });
 
     let botResponseText = '';
     const tempMessages = [...newMessages, { role: 'assistant', content: '' }];
     setMessages(tempMessages);
 
     await streamChatMessage({
-      messages: newMessages,
+      messages: apiPayloadMessages,
       patientInfo,
       onChunk: (chunk) => {
         botResponseText += chunk;
@@ -222,7 +227,7 @@ export default function App() {
           saveUserChatDB(currentUser.id, updatedChatObj);
         }
 
-        triggerSymptomAnalysis(userText, finalMessages);
+        triggerSymptomAnalysis(shownText, finalMessages);
       }
     });
   };
@@ -264,12 +269,12 @@ export default function App() {
     <div className="h-screen max-h-screen flex flex-col p-2 sm:p-3 overflow-hidden bg-gradient-to-br from-[#f3ebfc] via-[#e5d4fa] to-[#dbc6f8]">
       
       {/* Emergency Notice Banner */}
-      <div className="w-full max-w-7xl mx-auto flex-shrink-0 mb-1">
+      <div className="w-full flex-shrink-0 mb-1">
         <EmergencyBanner />
       </div>
 
-      {/* Main 3-Column Layout Container (Dynamic Responsive Viewport Height: h-[calc(100vh-3.5rem)]) */}
-      <div className="w-full max-w-7xl mx-auto flex-1 flex flex-col lg:flex-row items-stretch justify-center gap-3 min-h-0 relative">
+      {/* Main 3-Column Layout Container (100% Full Screen Occupancy) */}
+      <div className="w-full flex-1 flex flex-col lg:flex-row items-stretch justify-center gap-3 min-h-0 relative">
         
         {/* Left Sidebar Panel */}
         <Sidebar

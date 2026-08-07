@@ -1,7 +1,7 @@
 import React from 'react';
-import { Activity, Pill, HeartPulse, AlertTriangle, ShieldCheck, CheckCircle2, Info } from 'lucide-react';
+import { Activity, Pill, HeartPulse, AlertTriangle, ShieldCheck, CheckCircle2, Info, ChevronRight, Stethoscope } from 'lucide-react';
 
-export default function MarkdownRenderer({ content }) {
+export default function MarkdownRenderer({ content, onSelectDisease }) {
   if (!content) return null;
 
   // Helper to highlight bold text inside strings
@@ -28,6 +28,28 @@ export default function MarkdownRenderer({ content }) {
     if (!trimmed) {
       renderedElements.push(<div key={`empty-${idx}`} className="h-2" />);
       return;
+    }
+
+    // Check for interactive disease selection tag: [SELECT_DISEASE: Disease Name]
+    if (trimmed.includes('[SELECT_DISEASE:') || trimmed.startsWith('SELECT_DISEASE:')) {
+      const match = trimmed.match(/\[?SELECT_DISEASE:\s*([^\]\n]+)\]?/i);
+      if (match && match[1]) {
+        const diseaseName = match[1].trim();
+        renderedElements.push(
+          <div key={`select-disease-${idx}`} className="my-2 flex items-center">
+            <button
+              onClick={() => onSelectDisease && onSelectDisease(diseaseName)}
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-md shadow-purple-600/20 hover:shadow-lg hover:shadow-purple-600/30 hover:-translate-y-0.5 active:translate-y-0 transition-all cursor-pointer group"
+              title={`View OTC medications & curing techniques for ${diseaseName}`}
+            >
+              <Stethoscope className="w-3.5 h-3.5 text-purple-200 group-hover:scale-110 transition-transform" />
+              <span>Select {diseaseName} for Medication & Recovery Plan</span>
+              <ChevronRight className="w-3.5 h-3.5 text-white/80 group-hover:translate-x-0.5 transition-transform" />
+            </button>
+          </div>
+        );
+        return;
+      }
     }
 
     // Check for Section Headers (### or **Header:**)
@@ -84,10 +106,28 @@ export default function MarkdownRenderer({ content }) {
     // Check for Bullet point lines (* or - or 1.)
     if (trimmed.startsWith('* ') || trimmed.startsWith('- ') || /^\d+\.\s/.test(trimmed)) {
       const bulletText = trimmed.replace(/^[\*\-\d\.]+\s*/, '');
+      
+      // Extract disease name if bullet point contains disease prediction
+      const diseaseMatch = bulletText.match(/\*\*([^*]+)\*\*\s*\[(High|Moderate|Low)\s+Likelihood\]/i);
+
       renderedElements.push(
-        <div key={idx} className="flex items-start gap-2 text-xs text-slate-700 my-1.5 pl-2 leading-relaxed">
-          <CheckCircle2 className="w-4 h-4 text-purple-500 flex-shrink-0 mt-0.5" />
-          <div className="flex-1">{formatBold(bulletText)}</div>
+        <div key={idx} className="flex flex-col gap-1.5 my-1.5 pl-1">
+          <div className="flex items-start gap-2 text-xs text-slate-700 leading-relaxed">
+            <CheckCircle2 className="w-4 h-4 text-purple-500 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">{formatBold(bulletText)}</div>
+          </div>
+
+          {diseaseMatch && diseaseMatch[1] && (
+            <div className="pl-6">
+              <button
+                onClick={() => onSelectDisease && onSelectDisease(diseaseMatch[1])}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-[11px] border border-purple-200 hover:border-purple-300 transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95"
+              >
+                <Stethoscope className="w-3 h-3 text-purple-600" />
+                <span>Select {diseaseMatch[1]} → View Medicines & Treatment</span>
+              </button>
+            </div>
+          )}
         </div>
       );
       return;

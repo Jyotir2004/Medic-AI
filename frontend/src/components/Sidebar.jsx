@@ -111,7 +111,8 @@ export default function Sidebar({
           placeholder="Search symptoms or topics..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full bg-[#160f24] text-xs text-white placeholder-slate-400 rounded-xl pl-10 pr-8 py-2.5 focus:outline-none border border-white/10 focus:border-purple-400 focus:ring-2 focus:ring-purple-500/30 transition-all"
+          style={{ paddingLeft: '2.5rem', paddingRight: '2rem', paddingTop: '0.625rem', paddingBottom: '0.625rem', height: 'auto', minHeight: '40px', display: 'block' }}
+          className="w-full bg-[#160f24] text-xs text-white placeholder-slate-400 rounded-xl focus:outline-none border border-white/10 focus:border-purple-400 focus:ring-2 focus:ring-purple-500/30 transition-all"
         />
         {searchQuery && (
           <button
