@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import WelcomePage from './components/WelcomePage';
 import AuthPage from './components/AuthPage';
 import Sidebar from './components/Sidebar';
@@ -30,7 +30,7 @@ export default function App() {
     return savedUser ? JSON.parse(savedUser) : null;
   });
 
-  const [healthStatus, setHealthStatus] = useState({ status: 'checking', ollama_available: false, model_available: false });
+  const [healthStatus, setHealthStatus] = useState({ status: 'checking', hf_available: false, model_available: false });
   const [messages, setMessages] = useState([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -172,7 +172,24 @@ export default function App() {
     }
   };
 
+  const abortControllerRef = useRef(null);
+
+  const handleStopStreaming = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsStreaming(false);
+  };
+
   const handleSendMessage = async (userText, displayText = null) => {
+    // Abort any prior streaming if still running
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     const shownText = displayText || userText;
     const newMessages = [...messages, { role: 'user', content: shownText }];
     setMessages(newMessages);
@@ -195,6 +212,7 @@ export default function App() {
     await streamChatMessage({
       messages: apiPayloadMessages,
       patientInfo,
+      signal: abortController.signal,
       onChunk: (chunk) => {
         botResponseText += chunk;
         setMessages((prev) => {
@@ -209,14 +227,16 @@ export default function App() {
           const updated = [...prev];
           updated[updated.length - 1] = {
             role: 'assistant',
-            content: `⚠️ Error communicating with MedGemma 4B via Ollama. Please verify that Ollama is running.\nDetails: ${err.message}`
+            content: `⚠️ Error communicating with AI service. Please verify your connection.\nDetails: ${err.message}`
           };
           return updated;
         });
         setIsStreaming(false);
+        abortControllerRef.current = null;
       },
       onComplete: () => {
         setIsStreaming(false);
+        abortControllerRef.current = null;
         const finalMessages = [...newMessages, { role: 'assistant', content: botResponseText }];
         
         const updatedChatObj = { id: activeChatId, title: updatedTitle, messages: finalMessages, date: new Date().toLocaleDateString() };
@@ -227,9 +247,130 @@ export default function App() {
           saveUserChatDB(currentUser.id, updatedChatObj);
         }
 
-        triggerSymptomAnalysis(shownText, finalMessages);
+        // Minimize LLM calls: Only trigger secondary analysis if the user message reports clinical symptoms
+        const isMedicalQuery = () => {
+          if (!shownText || shownText.trim().length < 5) return false;
+          const lower = shownText.toLowerCase().trim();
+          const conversationalPhrases = [
+            'hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening',
+            'thanks', 'thank you', 'ok', 'okay', 'bye', 'goodbye', 'who are you', 'how are you'
+          ];
+          if (conversationalPhrases.some(p => lower === p || lower === `${p}!` || lower === `${p}.`)) {
+            return false;
+          }
+          const medicalKeywords = [
+            'pain', 'ache', 'fever', 'cough', 'cold', 'sore', 'throat', 'headache',
+            'stomach', 'nausea', 'vomit', 'dizzy', 'fatigue', 'rash', 'burn', 'itch',
+            'breath', 'chest', 'cramp', 'swell', 'infection', 'allergy', 'sick', 'hurt',
+            'symptom', 'disease', 'condition', 'migraine', 'flu', 'select', 'pressure'
+          ];
+          return medicalKeywords.some(kw => lower.includes(kw)) || lower.length > 25;
+        };
+
+        // Minimize LLM calls: Single-pass direct extraction from the assistant response
+        const directDiagnosis = extractAnalysisFromText(botResponseText, shownText);
+        if (directDiagnosis) {
+          setAnalysisData(directDiagnosis);
+        } else if (botResponseText.trim() && isMedicalQuery()) {
+          triggerSymptomAnalysis(shownText, finalMessages);
+        }
       }
     });
+  };
+
+  // Single-pass parser extracting structured clinical metadata without firing a 2nd LLM call
+  const extractAnalysisFromText = (responseText, userPrompt) => {
+    if (!responseText) return null;
+
+    const diseaseMatches = [...responseText.matchAll(/\[SELECT_DISEASE:\s*([^\]]+)\]/g)];
+    const diseases = diseaseMatches.map((m, idx) => ({
+      name: m[1].trim(),
+      description: `Differential condition identified for: "${userPrompt}"`,
+      likelihood: idx === 0 ? 'High' : idx === 1 ? 'Moderate' : 'Low'
+    }));
+
+    const targetMatch = responseText.match(/###\s*🔍\s*TARGET CONDITION:\s*([^\n]+)/i);
+    if (targetMatch && targetMatch[1]) {
+      diseases.unshift({
+        name: targetMatch[1].trim(),
+        description: 'Target condition evaluated for comprehensive treatment',
+        likelihood: 'High'
+      });
+    }
+
+    const medicines = [];
+    const medSection = responseText.split(/###\s*💊\s*SUGGESTED/i)[1];
+    if (medSection) {
+      const medBlock = medSection.split(/###/)[0];
+      const medMatches = [...medBlock.matchAll(/-\s*\*\*([^*]+)\*\*/g)];
+      medMatches.forEach((m) => {
+        const name = m[1].trim();
+        if (!name.toLowerCase().includes('dosage') && !name.toLowerCase().includes('purpose') && !name.toLowerCase().includes('precaution')) {
+          medicines.push({
+            name,
+            type: 'OTC Tablet / Care',
+            purpose: 'Symptom relief and therapeutic support',
+            dosage_note: 'Take as directed on packaging with water',
+            precautions: 'Do not exceed maximum daily dosage; consult doctor if symptoms persist.'
+          });
+        }
+      });
+    }
+
+    const techniques = [];
+    const techSection = responseText.split(/###\s*🌿\s*CURING/i)[1];
+    if (techSection) {
+      const techBlock = techSection.split(/###/)[0];
+      const techLines = techBlock.split('\n')
+        .map((l) => l.trim())
+        .filter((l) => l.startsWith('-'))
+        .map((l) => l.replace(/^-\s*(\*\*)?/, '').replace(/\*\*/g, '').trim())
+        .filter(Boolean);
+      techniques.push(...techLines);
+    }
+
+    const redFlags = [];
+    const flagSection = responseText.split(/###\s*⚠️\s*RED FLAGS/i)[1];
+    if (flagSection) {
+      const flagBlock = flagSection.split(/###/)[0];
+      const flagLines = flagBlock.split('\n')
+        .map((l) => l.trim())
+        .filter((l) => l.startsWith('-'))
+        .map((l) => l.replace(/^-\s*/, '').trim())
+        .filter(Boolean);
+      redFlags.push(...flagLines);
+    }
+
+    if (diseases.length > 0 || medicines.length > 0) {
+      return {
+        symptoms: [userPrompt],
+        possible_diseases: diseases.length > 0 ? diseases : [
+          { name: 'Clinical Evaluation', description: userPrompt, likelihood: 'Moderate' }
+        ],
+        suggested_medicines: medicines.length > 0 ? medicines : [
+          {
+            name: 'Paracetamol (Acetaminophen) 500mg',
+            type: 'Tablet (OTC)',
+            purpose: 'Pain relief and temperature reduction',
+            dosage_note: '1 tablet every 4-6 hours as needed',
+            precautions: 'Do not exceed 4,000 mg in 24 hours.'
+          }
+        ],
+        curing_techniques: techniques.length > 0 ? techniques : [
+          'Drink 2-3 liters of fluids daily to stay hydrated',
+          'Ensure 8+ hours of restful sleep',
+          'Monitor body temperature and symptom progression'
+        ],
+        urgency_level: redFlags.length > 0 ? 'Moderate' : 'Low',
+        red_flags: redFlags.length > 0 ? redFlags : [
+          'Persistent high fever > 38.5°C (101.3°F) for over 3 days',
+          'Difficulty breathing, acute chest pain, or severe weakness'
+        ],
+        disclaimer: 'This diagnosis summary is generated by BioMistral 7B. Consult a licensed physician for prescription treatments.'
+      };
+    }
+
+    return null;
   };
 
   const triggerSymptomAnalysis = async (latestSymptom, currentHistory) => {
@@ -301,6 +442,7 @@ export default function App() {
             messages={messages}
             onSendMessage={handleSendMessage}
             isStreaming={isStreaming}
+            onStopStreaming={handleStopStreaming}
             quickPrompts={quickPrompts}
             onAnalyzeMessage={handleAnalyzeSpecificMessage}
             isAnalyzing={isAnalyzing}

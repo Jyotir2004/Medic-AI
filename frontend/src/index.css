@@ -118,6 +118,40 @@ body {
   40% { transform: scale(1.0); opacity: 1; }
 }
 
+/* ChatGPT-style Streaming Cursor Caret */
+@keyframes chatgpt-cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.chatgpt-cursor {
+  display: inline-block;
+  width: 7px;
+  height: 14px;
+  vertical-align: -1px;
+  background-color: #9333ea;
+  margin-left: 3px;
+  border-radius: 1px;
+  animation: chatgpt-cursor-blink 0.8s infinite ease-in-out;
+}
+
+/* Soundwave Audio Playing Animation */
+@keyframes soundwave-pulse {
+  0%, 100% { height: 4px; }
+  50% { height: 12px; }
+}
+
+.soundwave-bar {
+  display: inline-block;
+  width: 2px;
+  background-color: #9333ea;
+  border-radius: 1px;
+  animation: soundwave-pulse 0.9s infinite ease-in-out;
+}
+.soundwave-bar:nth-child(2) { animation-delay: 0.15s; }
+.soundwave-bar:nth-child(3) { animation-delay: 0.3s; }
+.soundwave-bar:nth-child(4) { animation-delay: 0.45s; }
+
 /* Print styles */
 @media print {
   body {

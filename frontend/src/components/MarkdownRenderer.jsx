@@ -1,12 +1,38 @@
 import React from 'react';
 import { Activity, Pill, HeartPulse, AlertTriangle, ShieldCheck, CheckCircle2, Info, ChevronRight, Stethoscope } from 'lucide-react';
 
-export default function MarkdownRenderer({ content, onSelectDisease }) {
-  if (!content) return null;
+export default function MarkdownRenderer({ content, onSelectDisease, isStreaming = false }) {
+  if (!content) {
+    if (isStreaming) {
+      return (
+        <div className="flex items-center gap-2 py-1 text-slate-500">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse"></span>
+            <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse [animation-delay:200ms]"></span>
+            <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse [animation-delay:400ms]"></span>
+          </div>
+          <span className="text-xs font-semibold text-purple-700/80 animate-pulse">MedicAI is thinking...</span>
+        </div>
+      );
+    }
+    return null;
+  }
+
+  // Cursor element
+  const cursor = isStreaming ? (
+    <span className="chatgpt-cursor" aria-hidden="true" />
+  ) : null;
 
   // Helper to highlight bold text inside strings
   const formatBold = (text) => {
-    const parts = text.split(/(\*\*.*?\*\*)/g);
+    let processed = text;
+    // Temporarily close unclosed ** while streaming to prevent flickering
+    const count = (processed.match(/\*\*/g) || []).length;
+    if (count % 2 !== 0) {
+      processed += '**';
+    }
+
+    const parts = processed.split(/(\*\*.*?\*\*)/g);
     return parts.map((part, i) => {
       if (part.startsWith('**') && part.endsWith('**')) {
         const clean = part.slice(2, -2);
@@ -22,11 +48,17 @@ export default function MarkdownRenderer({ content, onSelectDisease }) {
 
   const lines = content.split('\n');
   const renderedElements = [];
+  const lastLineIdx = lines.length - 1;
 
   lines.forEach((line, idx) => {
+    const isLast = idx === lastLineIdx;
     const trimmed = line.trim();
     if (!trimmed) {
-      renderedElements.push(<div key={`empty-${idx}`} className="h-2" />);
+      renderedElements.push(
+        <div key={`empty-${idx}`} className="h-2">
+          {isLast && cursor}
+        </div>
+      );
       return;
     }
 
@@ -46,6 +78,7 @@ export default function MarkdownRenderer({ content, onSelectDisease }) {
               <span>Select {diseaseName} for Medication & Recovery Plan</span>
               <ChevronRight className="w-3.5 h-3.5 text-white/80 group-hover:translate-x-0.5 transition-transform" />
             </button>
+            {isLast && cursor}
           </div>
         );
         return;
@@ -87,6 +120,7 @@ export default function MarkdownRenderer({ content, onSelectDisease }) {
             {icon}
             <span>{titleText}</span>
           </h3>
+          {isLast && cursor}
         </div>
       );
       return;
@@ -97,7 +131,10 @@ export default function MarkdownRenderer({ content, onSelectDisease }) {
       renderedElements.push(
         <div key={idx} className="my-3 p-3 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-2.5 shadow-sm">
           <Info className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-          <div className="leading-relaxed">{formatBold(trimmed)}</div>
+          <div className="leading-relaxed">
+            {formatBold(trimmed)}
+            {isLast && cursor}
+          </div>
         </div>
       );
       return;
@@ -114,7 +151,10 @@ export default function MarkdownRenderer({ content, onSelectDisease }) {
         <div key={idx} className="flex flex-col gap-1.5 my-1.5 pl-1">
           <div className="flex items-start gap-2 text-xs text-slate-700 leading-relaxed">
             <CheckCircle2 className="w-4 h-4 text-purple-500 flex-shrink-0 mt-0.5" />
-            <div className="flex-1">{formatBold(bulletText)}</div>
+            <div className="flex-1">
+              {formatBold(bulletText)}
+              {isLast && cursor}
+            </div>
           </div>
 
           {diseaseMatch && diseaseMatch[1] && (
@@ -137,6 +177,7 @@ export default function MarkdownRenderer({ content, onSelectDisease }) {
     renderedElements.push(
       <p key={idx} className="text-xs sm:text-sm text-slate-800 leading-relaxed my-1.5">
         {formatBold(trimmed)}
+        {isLast && cursor}
       </p>
     );
   });

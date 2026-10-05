@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 export async function checkBackendHealth() {
   try {
@@ -8,7 +8,7 @@ export async function checkBackendHealth() {
   } catch (err) {
     return {
       status: 'disconnected',
-      ollama_available: false,
+      hf_available: false,
       model_available: false,
       error: err.message
     };
@@ -89,13 +89,14 @@ export async function deleteUserChatDB(userId, chatId) {
   }
 }
 
-export async function streamChatMessage({ messages, patientInfo, onChunk, onError, onComplete }) {
+export async function streamChatMessage({ messages, patientInfo, onChunk, onError, onComplete, signal }) {
   try {
     const response = await fetch(`${API_BASE_URL}/api/chat/stream`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
+      signal,
       body: JSON.stringify({
         messages,
         patient_info: patientInfo
@@ -103,7 +104,8 @@ export async function streamChatMessage({ messages, patientInfo, onChunk, onErro
     });
 
     if (!response.ok) {
-      throw new Error(`Server returned status ${response.status}`);
+      const errText = await response.text().catch(() => '');
+      throw new Error(`Server returned status ${response.status}: ${errText || response.statusText}`);
     }
 
     const reader = response.body.getReader();
@@ -115,12 +117,15 @@ export async function streamChatMessage({ messages, patientInfo, onChunk, onErro
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n\n');
+      const lines = buffer.split('\n');
       buffer = lines.pop() || '';
 
-      for (const line of lines) {
+      for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (!line) continue;
+
         if (line.startsWith('data: ')) {
-          const dataStr = line.replace('data: ', '').trim();
+          const dataStr = line.slice(6).trim();
           if (dataStr === '[DONE]') {
             if (onComplete) onComplete();
             return;
@@ -129,15 +134,23 @@ export async function streamChatMessage({ messages, patientInfo, onChunk, onErro
             const parsed = JSON.parse(dataStr);
             if (parsed.content && onChunk) {
               onChunk(parsed.content);
+            } else if (parsed.error && onError) {
+              onError(new Error(parsed.error));
+              return;
             }
           } catch (e) {
-            console.error('Error parsing SSE chunk:', e);
+            console.error('Error parsing SSE chunk:', e, dataStr);
           }
         }
       }
     }
     if (onComplete) onComplete();
   } catch (err) {
+    if (err.name === 'AbortError') {
+      console.log('Stream stopped by user');
+      if (onComplete) onComplete();
+      return;
+    }
     if (onError) onError(err);
   }
 }
@@ -164,6 +177,17 @@ export async function analyzeSymptoms(symptoms, conversationHistory = []) {
 }
 
 // ElevenLabs Speech-to-Text (STT) via Scribe v2
+// Check voice status (ElevenLabs vs Browser synthesis)
+export async function checkVoiceStatus() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/voice/status`);
+    if (!res.ok) return { tts_ready: false, stt_ready: false, provider: 'browser' };
+    return await res.json();
+  } catch (err) {
+    return { tts_ready: false, stt_ready: false, provider: 'browser' };
+  }
+}
+
 export async function convertSpeechToTextElevenLabs(audioBlob) {
   try {
     const formData = new FormData();

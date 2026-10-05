@@ -2,14 +2,14 @@ import React, { useState } from 'react';
 import { X, User, ShieldAlert, HeartPulse, Sparkles } from 'lucide-react';
 
 export default function PatientProfile({ isOpen, onClose, patientInfo, onSave }) {
-  if (!isOpen) return null;
-
   const [formData, setFormData] = useState({
-    age: patientInfo.age === 'Not specified' ? '' : patientInfo.age,
-    gender: patientInfo.gender === 'Not specified' ? 'Male' : patientInfo.gender,
-    allergies: patientInfo.allergies === 'None' ? '' : patientInfo.allergies,
-    conditions: patientInfo.conditions === 'None' ? '' : patientInfo.conditions,
+    age: patientInfo?.age === 'Not specified' ? '' : (patientInfo?.age || ''),
+    gender: patientInfo?.gender === 'Not specified' ? 'Male' : (patientInfo?.gender || 'Male'),
+    allergies: patientInfo?.allergies === 'None' ? '' : (patientInfo?.allergies || ''),
+    conditions: patientInfo?.conditions === 'None' ? '' : (patientInfo?.conditions || ''),
   });
+
+  if (!isOpen) return null;
 
   const handleSubmit = (e) => {
     e.preventDefault();

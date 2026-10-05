@@ -10,7 +10,7 @@ from config import settings
 from database import engine, get_db, Base
 import models
 from auth import hash_password, verify_password
-from ollama_client import ollama_client
+from hf_client import hf_client
 from elevenlabs_service import elevenlabs_service
 
 # Initialize SQLite database tables
@@ -18,7 +18,7 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="MedicAI Backend API",
-    description="Medical Assistant API with SQLite DB, MedGemma 4B, and ElevenLabs AI Voice",
+    description="Medical Assistant API with SQLite DB, BioMistral 7B, and ElevenLabs AI Voice",
     version="3.0.0"
 )
 
@@ -76,7 +76,8 @@ async def root():
     return {
         "app": "MedicAI Assistant API",
         "database": "SQLite (medicai.db)",
-        "model": settings.OLLAMA_MODEL,
+        "provider": "Hugging Face",
+        "model": settings.HF_MODEL,
         "elevenlabs_stt": settings.ELEVENLABS_STT_MODEL,
         "elevenlabs_tts": settings.ELEVENLABS_TTS_MODEL,
         "status": "online"
@@ -84,7 +85,7 @@ async def root():
 
 @app.get("/api/health")
 async def health_check():
-    health = await ollama_client.check_health()
+    health = await hf_client.check_health()
     health["database"] = "sqlite_connected"
     health["elevenlabs_stt_model"] = settings.ELEVENLABS_STT_MODEL
     health["elevenlabs_tts_model"] = settings.ELEVENLABS_TTS_MODEL
@@ -205,21 +206,51 @@ async def chat_stream(req: ChatRequest):
     patient_dict = req.patient_info.dict() if req.patient_info else {}
 
     async def event_generator():
-        async for chunk in ollama_client.chat_stream(messages_dict, patient_dict):
-            data_payload = json.dumps({"content": chunk})
-            yield f"data: {data_payload}\n\n"
-        yield "data: [DONE]\n\n"
+        try:
+            async for chunk in hf_client.chat_stream(messages_dict, patient_dict):
+                data_payload = json.dumps({"content": chunk})
+                yield f"data: {data_payload}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as e:
+            err_payload = json.dumps({"error": str(e)})
+            yield f"data: {err_payload}\n\n"
+            yield "data: [DONE]\n\n"
 
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_generator(), 
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
+
+# In-memory symptom analysis cache to minimize LLM calls
+ANALYSIS_CACHE: Dict[str, Any] = {}
 
 @app.post("/api/analyze")
 async def analyze_symptoms(req: AnalysisRequest):
-    """Analyze symptoms and output structured JSON diagnosis."""
+    """Analyze symptoms and output structured JSON diagnosis with caching."""
+    cache_key = req.symptoms.strip().lower()
+    if cache_key in ANALYSIS_CACHE:
+        return {
+            "success": True,
+            "data": ANALYSIS_CACHE[cache_key],
+            "cached": True
+        }
+
     history_dict = [{"role": msg.role, "content": msg.content} for msg in (req.conversation_history or [])]
-    analysis = await ollama_client.analyze_symptoms(req.symptoms, history_dict)
+    analysis = await hf_client.analyze_symptoms(req.symptoms, history_dict)
+
+    if len(ANALYSIS_CACHE) > 100:
+        ANALYSIS_CACHE.pop(next(iter(ANALYSIS_CACHE)))
+    ANALYSIS_CACHE[cache_key] = analysis
+
     return {
         "success": True,
-        "data": analysis
+        "data": analysis,
+        "cached": False
     }
 
 # ElevenLabs Speech-to-Text (Scribe v2)
@@ -237,6 +268,18 @@ async def speech_to_text(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# Voice API Status
+@app.get("/api/voice/status")
+async def get_voice_status():
+    """Return voice service status and provider availability."""
+    return {
+        "configured": bool(elevenlabs_service.api_key),
+        "tts_ready": elevenlabs_service.is_tts_ready(),
+        "stt_ready": elevenlabs_service.is_stt_ready(),
+        "provider": "elevenlabs" if elevenlabs_service.is_tts_ready() else "browser",
+        "voice_label": "BioMistral Medical Consultant"
+    }
+
 # ElevenLabs Text-to-Speech (Multilingual v2)
 @app.post("/api/voice/tts")
 async def text_to_speech(req: TTSRequest):
@@ -246,7 +289,7 @@ async def text_to_speech(req: TTSRequest):
 
     audio_bytes = await elevenlabs_service.text_to_speech(req.text, req.voice_id)
     if not audio_bytes:
-        raise HTTPException(status_code=500, detail="Failed to synthesize speech via ElevenLabs API")
+        raise HTTPException(status_code=503, detail="ElevenLabs TTS unavailable or lacks permission")
 
     return Response(content=audio_bytes, media_type="audio/mpeg")
 

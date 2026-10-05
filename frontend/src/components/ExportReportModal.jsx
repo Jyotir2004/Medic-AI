@@ -11,7 +11,7 @@ export default function ExportReportModal({ isOpen, onClose, messages, analysisD
   const handleDownload = () => {
     let reportText = `MEDICAI CLINICAL CONSULTATION SUMMARY\n`;
     reportText += `Generated: ${new Date().toLocaleString()}\n`;
-    reportText += `Model: medgemma:4b via Ollama\n`;
+    reportText += `Model: BioMistral 7B via Hugging Face\n`;
     reportText += `----------------------------------------\n\n`;
     
     reportText += `PATIENT BACKGROUND:\n`;
@@ -104,7 +104,7 @@ export default function ExportReportModal({ isOpen, onClose, messages, analysisD
               <h1 className="text-xl font-bold text-cyan-400 flex items-center gap-2">
                 <Stethoscope className="w-6 h-6" /> MedicAI Clinical Assessment
               </h1>
-              <p className="text-xs text-slate-400 mt-0.5">Powered by MedGemma 4B • Ollama LLM</p>
+              <p className="text-xs text-slate-400 mt-0.5">Powered by BioMistral 7B • Hugging Face</p>
             </div>
             <div className="text-right text-xs text-slate-400">
               <p>Date: {new Date().toLocaleDateString()}</p>
@@ -186,7 +186,7 @@ export default function ExportReportModal({ isOpen, onClose, messages, analysisD
               {messages.map((m, idx) => (
                 <div key={idx} className={`p-2.5 rounded-lg ${m.role === 'user' ? 'bg-slate-900 text-cyan-200' : 'bg-slate-900/60 border border-slate-800 text-slate-300'}`}>
                   <span className="font-bold uppercase text-[10px] text-slate-500 block mb-0.5">
-                    {m.role === 'user' ? 'Patient' : 'MedicAI (MedGemma:4b)'}
+                    {m.role === 'user' ? 'Patient' : 'MedicAI (BioMistral 7B)'}
                   </span>
                   <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
                 </div>

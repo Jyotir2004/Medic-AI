@@ -22,7 +22,7 @@ export default function WelcomePage({ onContinue }) {
 
           <div className="flex items-center gap-2 pt-2">
             <span className="px-3 py-1 rounded-full bg-purple-100 text-purple-800 text-xs font-bold uppercase tracking-wider border border-purple-200">
-              MedGemma 4B AI
+              BioMistral 7B AI
             </span>
             <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold uppercase tracking-wider border border-emerald-200 flex items-center gap-1">
               <CheckCircle2 className="w-3.5 h-3.5" /> ElevenLabs Voice AI
@@ -46,7 +46,7 @@ export default function WelcomePage({ onContinue }) {
             <Activity className="w-6 h-6 text-purple-600" />
             <h3 className="text-xs font-bold text-slate-900">Symptom Prediction</h3>
             <p className="text-[11px] text-slate-500 leading-normal">
-              Cross-references symptoms with MedGemma 4B guidelines.
+              Cross-references symptoms with BioMistral 7B guidelines.
             </p>
           </div>
 

@@ -91,7 +91,7 @@ export default function Sidebar({
           </div>
           <div>
             <h2 className="text-xs font-bold text-slate-100 truncate">MedicAI Assistant</h2>
-            <p className="text-[10px] text-purple-300 font-semibold">MedGemma 4B • Online</p>
+            <p className="text-[10px] text-purple-300 font-semibold">BioMistral 7B • Online</p>
           </div>
         </div>
 
