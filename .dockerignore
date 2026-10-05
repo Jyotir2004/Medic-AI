@@ -1,0 +1,13 @@
+.git
+.github
+node_modules
+frontend/node_modules
+__pycache__
+*.pyc
+.env
+.env.*
+!.env.example
+*.db
+.vercel
+dist
+frontend/dist

@@ -1,0 +1,47 @@
+services:
+  # ===========================================================================
+  # 1. Python FastAPI Backend Service
+  # ===========================================================================
+  - type: web
+    name: medicai-backend
+    runtime: python
+    rootDir: backend
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: HF_API_KEY
+        sync: false
+      - key: HF_MODEL
+        value: BioMistral/BioMistral-7B
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: ELEVENLABS_VOICE_ID
+        value: 21m00Tcm4TlvDq8ikWAM
+      - key: ELEVENLABS_TTS_MODEL
+        value: eleven_multilingual_v2
+      - key: ELEVENLABS_STT_MODEL
+        value: scribe_v2
+
+  # ===========================================================================
+  # 2. Vite React Frontend (Static Site - 100% Free on Render)
+  # ===========================================================================
+  - type: static
+    name: medicai-frontend
+    rootDir: frontend
+    plan: free
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_BASE_URL
+        fromService:
+          type: web
+          name: medicai-backend
+          property: host
